@@ -49,8 +49,12 @@ pipeline {
                     echo $! > app.pid
                     sleep 3
 
+                    echo "Checking Flask health endpoint..."
                     .venv/bin/python -c \
                         "from urllib.request import urlopen; print(urlopen('http://127.0.0.1:5000/health').read().decode())"
+
+                    echo "Application log:"
+                    tail -n 20 app.log
                 '''
             }
         }
