@@ -37,8 +37,16 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo 'Deploying Flask application on Azure Agent'
+
                 sh '''
+		    set -eu
+
+		    echo "Agent hostname: $(hostname)"
+                    echo "Agent user: $(whoami)"
+                    echo "Workspace: $(pwd)"
+
                     if [ -f app.pid ]; then
+			OLD_PID=$(cat app.pid)
                         kill "$(cat app.pid)" 2>/dev/null || true
                         rm -f app.pid
                     fi
@@ -46,8 +54,16 @@ pipeline {
                     nohup .venv/bin/python app.py \
                         > app.log 2>&1 < /dev/null &
 
-                    echo $! > app.pid
+		    APP_PID=$!
+                    echo "$APP_PID" > app.pid
+
                     sleep 3
+
+		    if ! kill -0 "$APP_PID" 2>/dev/null; then
+			 echo "Flask failed to start. Application log:"
+			 cat app.log
+			 exit 1
+		    fi 
 
                     echo "Checking Flask health endpoint..."
                     .venv/bin/python -c \
@@ -55,6 +71,8 @@ pipeline {
 
                     echo "Application log:"
                     tail -n 20 app.log
+
+		    echo "Deployment health cheak passed"
                 '''
             }
         }
