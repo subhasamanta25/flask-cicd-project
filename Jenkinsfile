@@ -18,7 +18,7 @@ pipeline {
             steps {
                 echo 'Installing Python dependencies'
                 sh '''
-                    python3 --version
+       x             python3 --version
                     python3 -m venv .venv
                     .venv/bin/pip install -r requirements.txt
                 '''
@@ -45,38 +45,18 @@ pipeline {
                     echo "Agent user: $(whoami)"
                     echo "Workspace: $(pwd)"
 
-                    if [ -f app.pid ]; then
-			OLD_PID=$(cat app.pid)
-                        kill "$(cat app.pid)" 2>/dev/null || true
-                        rm -f app.pid
-                    fi
+                    echo "Restarting Flask systemd service..."
+		    sudo systemctl restart flask-cicd
 
-                    nohup .venv/bin/python app.py \
-                        > app.log 2>&1 < /dev/null &
+		    echo "Checking service status..."
+		    sudo systemctl is-active --quiet flask-cicd
 
-		    APP_PID=$!
-                    echo "$APP_PID" > app.pid
-
-                    sleep 3
-
-		    if ! kill -0 "$APP_PID" 2>/dev/null; then
-			 echo "Flask failed to start. Application log:"
-			 cat app.log
-			 exit 1
-		    fi 
-
-                    echo "Checking Flask health endpoint..."
-                    .venv/bin/python -c \
-                        "from urllib.request import urlopen; print(urlopen('http://127.0.0.1:5000/health').read().decode())"
-
-                    echo "Application log:"
-                    tail -n 20 app.log
-
-		    echo "Deployment health cheak passed"
-                '''
+		    echo "Checking Flask health endpoint..."
+		    .venv/bin/python -c \
+			 "from urllib.request import urlopen; print(urlopen('http://127.0.0.1:5000/health', timeout=10).read().decode())"
+		    echo "Deployment health check passed!" '''
             }
         }
-    }
 
     post {
         success {
